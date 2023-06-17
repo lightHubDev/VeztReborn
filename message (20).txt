@@ -1,0 +1,280 @@
+local Player = game.Players.LocalPlayer
+local Character = Player.Character or Player.CharacterAdded:Wait()
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+local Humanoid = Character:WaitForChild("Humanoid")
+
+local Mouse = Player:GetMouse()
+
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+
+local SpeedBooleanValue = true
+local ReachBooleanValue = true
+local BedTp = true
+local BedTpCooldown = false
+
+local BedwarsStore = {
+	attackReach = 0,
+	attackReachUpdate = tick(),
+	blocks = {},
+	blockPlacer = {},
+	blockPlace = tick(),
+	blockRaycast = RaycastParams.new(),
+	equippedKit = "none",
+	inventories = {},
+	localInventory = {
+		inventory = {
+			items = {},
+			armor = {}
+		},
+		hotbar = {}
+	},
+	localHand = {},
+	matchState = 0,
+	matchStateChanged = tick(),
+	queueType = "bedwars_test",
+	statistics = {
+		beds = 0,
+		kills = 0,
+		lagbacks = 0,
+		lagbackEvent = Instance.new("BindableEvent"),
+		reported = 0,
+		universalLagbacks = 0
+	},
+	zephyrOrb = 0
+}
+
+local function DumpRemote(tab)
+	for i,v in pairs(tab) do
+		if v == "Client" then
+			return tab[i + 1]
+		end
+	end
+	return ""
+end
+
+local KnitGotten, KnitClient
+repeat
+	KnitGotten, KnitClient = pcall(function()
+		return debug.getupvalue(require(Player.PlayerScripts.TS.knit).setup, 6)
+	end)
+	if KnitGotten then break end
+	task.wait()
+until KnitGotten
+repeat task.wait() until debug.getupvalue(KnitClient.Start, 1)
+local Flamework = require(ReplicatedStorage["rbxts_include"]["node_modules"]["@flamework"].core.out).Flamework
+local Client = require(ReplicatedStorage.TS.remotes).default.Client
+local InventoryUtil = require(ReplicatedStorage.TS.inventory["inventory-util"]).InventoryUtil
+
+Bedwars = {
+	AnimationType = require(ReplicatedStorage.TS.animation["animation-type"]).AnimationType,
+	AnimationUtil = require(ReplicatedStorage["rbxts_include"]["node_modules"]["@easy-games"]["game-core"].out["shared"].util["animation-util"]).AnimationUtil,
+	AppController = require(ReplicatedStorage["rbxts_include"]["node_modules"]["@easy-games"]["game-core"].out.client.controllers["app-controller"]).AppController,
+	AbilityController = Flamework.resolveDependency("@easy-games/game-core:client/controllers/ability/ability-controller@AbilityController"),
+	AttackRemote = DumpRemote(debug.getconstants(KnitClient.Controllers.SwordController.attackEntity)),
+	BalloonController = KnitClient.Controllers.BalloonController,
+	BalanceFile = require(ReplicatedStorage.TS.balance["balance-file"]).BalanceFile,
+	BatteryEffectController = KnitClient.Controllers.BatteryEffectsController,
+	BatteryRemote = DumpRemote(debug.getconstants(debug.getproto(debug.getproto(KnitClient.Controllers.BatteryController.KnitStart, 1), 1))),
+	BlockBreaker = KnitClient.Controllers.BlockBreakController.blockBreaker,
+	BlockController = require(ReplicatedStorage["rbxts_include"]["node_modules"]["@easy-games"]["block-engine"].out).BlockEngine,
+	BlockCpsController = KnitClient.Controllers.BlockCpsController,
+	BlockPlacer = require(ReplicatedStorage["rbxts_include"]["node_modules"]["@easy-games"]["block-engine"].out.client.placement["block-placer"]).BlockPlacer,
+	BlockEngine = require(Player.PlayerScripts.TS.lib["block-engine"]["client-block-engine"]).ClientBlockEngine,
+	BlockEngineClientEvents = require(ReplicatedStorage["rbxts_include"]["node_modules"]["@easy-games"]["block-engine"].out.client["block-engine-client-events"]).BlockEngineClientEvents,
+	BlockPlacementController = KnitClient.Controllers.BlockPlacementController,
+	BowConstantsTable = debug.getupvalue(KnitClient.Controllers.ProjectileController.enableBeam, 6),
+	ProjectileController = KnitClient.Controllers.ProjectileController,
+	ChestController = KnitClient.Controllers.ChestController,
+	CannonHandController = KnitClient.Controllers.CannonHandController,
+	CannonAimRemote = DumpRemote(debug.getconstants(debug.getproto(KnitClient.Controllers.CannonController.startAiming, 5))),
+	CannonLaunchRemote = DumpRemote(debug.getconstants(KnitClient.Controllers.CannonHandController.launchSelf)),
+	ClickHold = require(ReplicatedStorage["rbxts_include"]["node_modules"]["@easy-games"]["game-core"].out.client.ui.lib.util["click-hold"]).ClickHold,
+	ClientHandler = Client,
+	ClientConstructor = require(ReplicatedStorage["rbxts_include"]["node_modules"]["@rbxts"].net.out.client),
+	ClientHandlerDamageBlock = require(ReplicatedStorage["rbxts_include"]["node_modules"]["@easy-games"]["block-engine"].out.shared.remotes).BlockEngineRemotes.Client,
+	ClientStoreHandler = require(Player.PlayerScripts.TS.ui.store).ClientStore,
+	CombatConstant = require(ReplicatedStorage.TS.combat["combat-constant"]).CombatConstant,
+	CombatController = KnitClient.Controllers.CombatController,
+	ConstantManager = require(ReplicatedStorage["rbxts_include"]["node_modules"]["@easy-games"]["game-core"].out["shared"].constant["constant-manager"]).ConstantManager,
+	ConsumeSoulRemote = DumpRemote(debug.getconstants(KnitClient.Controllers.GrimReaperController.consumeSoul)),
+	DamageIndicator = KnitClient.Controllers.DamageIndicatorController.spawnDamageIndicator,
+	DamageIndicatorController = KnitClient.Controllers.DamageIndicatorController,
+	DefaultKillEffect = require(Player.PlayerScripts.TS.controllers.game.locker["kill-effect"].effects["default-kill-effect"]),
+	DropItem = KnitClient.Controllers.ItemDropController.dropItemInHand,
+	DropItemRemote = DumpRemote(debug.getconstants(KnitClient.Controllers.ItemDropController.dropItemInHand)),
+	DragonSlayerController = KnitClient.Controllers.DragonSlayerController,
+	DragonRemote = DumpRemote(debug.getconstants(debug.getproto(debug.getproto(KnitClient.Controllers.DragonSlayerController.KnitStart, 2), 1))),
+	EatRemote = DumpRemote(debug.getconstants(debug.getproto(KnitClient.Controllers.ConsumeController.onEnable, 1))),
+	EquipItemRemote = DumpRemote(debug.getconstants(debug.getproto(require(ReplicatedStorage.TS.entity.entities["inventory-entity"]).InventoryEntity.equipItem, 3))),
+	EmoteMeta = require(ReplicatedStorage.TS.locker.emote["emote-meta"]).EmoteMeta,
+	FishermanTable = KnitClient.Controllers.FishermanController,
+	FovController = KnitClient.Controllers.FovController,
+	GameAnimationUtil = require(ReplicatedStorage.TS.animation["animation-util"]).GameAnimationUtil,
+	EntityUtil = require(ReplicatedStorage.TS.entity["entity-util"]).EntityUtil,
+	getIcon = function(item, showinv)
+		local itemmeta = Bedwars.ItemTable[item.itemType]
+		if itemmeta and showinv then
+			return itemmeta.image or ""
+		end
+		return ""
+	end,
+	getInventory = function(plr)
+		local suc, result = pcall(function() 
+			return InventoryUtil.getInventory(plr) 
+		end)
+		return (suc and result or {
+			items = {},
+			armor = {},
+			hand = nil
+		})
+	end,
+	GrimReaperController = KnitClient.Controllers.GrimReaperController,
+	GuitarHealRemote = DumpRemote(debug.getconstants(KnitClient.Controllers.GuitarController.performHeal)),
+	HangGliderController = KnitClient.Controllers.HangGliderController,
+	HighlightController = KnitClient.Controllers.EntityHighlightController,
+	ItemTable = debug.getupvalue(require(ReplicatedStorage.TS.item["item-meta"]).getItemMeta, 1),
+	InfernalShieldController = KnitClient.Controllers.InfernalShieldController,
+	KatanaController = KnitClient.Controllers.DaoController,
+	KillEffectMeta = require(ReplicatedStorage.TS.locker["kill-effect"]["kill-effect-meta"]).KillEffectMeta,
+	KillEffectController = KnitClient.Controllers.KillEffectController,
+	KnockbackUtil = require(ReplicatedStorage.TS.damage["knockback-util"]).KnockbackUtil,
+	LobbyClientEvents = KnitClient.Controllers.QueueController,
+	MapController = KnitClient.Controllers.MapController,
+	MinerRemote = DumpRemote(debug.getconstants(debug.getproto(KnitClient.Controllers.MinerController.onKitEnabled, 1))),
+	MageRemote = DumpRemote(debug.getconstants(debug.getproto(KnitClient.Controllers.MageController.registerTomeInteraction, 1))),
+	MageKitUtil = require(ReplicatedStorage.TS.games.bedwars.kit.kits.mage["mage-kit-util"]).MageKitUtil,
+	MageController = KnitClient.Controllers.MageController,
+	MissileController = KnitClient.Controllers.GuidedProjectileController,
+	PickupMetalRemote = DumpRemote(debug.getconstants(debug.getproto(debug.getproto(KnitClient.Controllers.MetalDetectorController.KnitStart, 1), 2))),
+	PickupRemote = DumpRemote(debug.getconstants(KnitClient.Controllers.ItemDropController.checkForPickup)),
+	ProjectileMeta = require(ReplicatedStorage.TS.projectile["projectile-meta"]).ProjectileMeta,
+	ProjectileRemote = DumpRemote(debug.getconstants(debug.getupvalue(KnitClient.Controllers.ProjectileController.launchProjectileWithValues, 2))),
+	QueryUtil = require(ReplicatedStorage["rbxts_include"]["node_modules"]["@easy-games"]["game-core"].out).GameQueryUtil,
+	QueueCard = require(Player.PlayerScripts.TS.controllers.global.queue.ui["queue-card"]).QueueCard,
+	QueueMeta = require(ReplicatedStorage.TS.game["queue-meta"]).QueueMeta,
+	RavenTable = KnitClient.Controllers.RavenController,
+	RelicController = KnitClient.Controllers.RelicVotingController,
+	ReportRemote = DumpRemote(debug.getconstants(require(Player.PlayerScripts.TS.controllers.global.report["report-controller"]).default.reportPlayer)),
+	ResetRemote = DumpRemote(debug.getconstants(debug.getproto(KnitClient.Controllers.ResetController.createBindable, 1))),
+	Roact = require(ReplicatedStorage["rbxts_include"]["node_modules"]["@rbxts"]["roact"].src),
+	RuntimeLib = require(ReplicatedStorage["rbxts_include"].RuntimeLib),
+	Shop = require(ReplicatedStorage.TS.games.bedwars.shop["bedwars-shop"]).BedwarsShop,
+	ShopItems = debug.getupvalue(debug.getupvalue(require(ReplicatedStorage.TS.games.bedwars.shop["bedwars-shop"]).BedwarsShop.getShopItem, 1), 2),
+	SoundList = require(ReplicatedStorage.TS.sound["game-sound"]).GameSound,
+	SoundManager = require(ReplicatedStorage["rbxts_include"]["node_modules"]["@easy-games"]["game-core"].out).SoundManager,
+	SpawnRavenRemote = DumpRemote(debug.getconstants(KnitClient.Controllers.RavenController.spawnRaven)),
+	SprintController = KnitClient.Controllers.SprintController,
+	StopwatchController = KnitClient.Controllers.StopwatchController,
+	SwordController = KnitClient.Controllers.SwordController,
+	TreeRemote = DumpRemote(debug.getconstants(debug.getproto(debug.getproto(KnitClient.Controllers.BigmanController.KnitStart, 1), 2))),
+	TrinityRemote = DumpRemote(debug.getconstants(debug.getproto(KnitClient.Controllers.AngelController.onKitEnabled, 1))),
+	ViewmodelController = KnitClient.Controllers.ViewmodelController,
+	WeldTable = require(ReplicatedStorage.TS.util["weld-util"]).WeldUtil,
+	ZephyrController = KnitClient.Controllers.WindWalkerController
+}
+
+
+local OldZephyrUpdate = Bedwars.ZephyrController.updateJump
+Bedwars.ZephyrController.updateJump = function(self, orb, ...)
+	BedwarsStore.zephyrOrb = orb
+	return OldZephyrUpdate(self, orb, ...)
+end
+
+local function FPS()
+	local TimeFunction = RunService:IsRunning() and time or os.clock
+
+	local LastIteration, Start
+	local FrameUpdateTable = {}
+
+	local function HeartbeatUpdate()
+		LastIteration = TimeFunction()
+		for Index = #FrameUpdateTable, 1, -1 do
+			FrameUpdateTable[Index + 1] = FrameUpdateTable[Index] >= LastIteration - 1 and FrameUpdateTable[Index] or nil
+		end
+		FrameUpdateTable[1] = LastIteration
+
+		print(math.floor(TimeFunction() - Start >= 1 and #FrameUpdateTable or #FrameUpdateTable / (TimeFunction() - Start)))
+	end
+
+	Start = TimeFunction()
+	RunService.Heartbeat:Connect(HeartbeatUpdate)
+end
+
+local function GetSpeedMultiplier(Reduce)
+	local Speed = 1
+	if Character then
+		local SpeedDamageBoost = Character:GetAttribute("SpeedBoost")
+		if SpeedDamageBoost and SpeedDamageBoost > 1 then
+			Speed = Speed + (SpeedDamageBoost - 1)
+		end
+		if Character:GetAttribute("GrimReaperChannel") then
+			Speed = Speed + 0.6
+		end
+		if Character:GetAttribute("SpeedPieBuff") then
+			Speed = Speed + (BedwarsStore.queueType == "SURVIVAL" and 0.15 or 0.24)
+		end
+		local Armor = BedwarsStore.localInventory.inventory.armor[3]
+		if type(Armor) ~= "table" then Armor = {itemType = ""} end
+		if Armor.itemType == "speed_boots" then
+			Speed = Speed + 1
+		end
+		if BedwarsStore.zephyrOrb ~= 0 then
+			Speed = Speed + 1.3
+		end
+	end
+	return Reduce and Speed ~= 1 and math.max(Speed * (0.8 - (0.3 * math.floor(Speed))), 1) or Speed
+end
+
+
+RunService.Heartbeat:Connect(function(Delta)
+	if Humanoid.Health > 0 and HumanoidRootPart and SpeedBooleanValue == true then
+		local SpeedMultiplier = {Value = 23.4}
+		local DamageTick = tick()
+		local SpeedValue = ((DamageTick > tick() and SpeedMultiplier.Value * 2.25 or SpeedMultiplier.Value) * GetSpeedMultiplier(true))
+		local SpeedCFrame = Humanoid.MoveDirection * (SpeedValue - 20) * Delta
+		local Params = RaycastParams.new()
+		Params.FilterDescendantsInstances = {Character}
+		Params.FilterType = Enum.RaycastFilterType.Blacklist		
+		local Raycast = workspace:Raycast(HumanoidRootPart.Position, SpeedCFrame, Params)
+		if Raycast then
+			SpeedCFrame = (Raycast.Position - HumanoidRootPart.Position)
+			HumanoidRootPart.CFrame = HumanoidRootPart.CFrame + SpeedCFrame
+			DamageTick = tick() + 0.4
+		else
+			if not Raycast then
+				HumanoidRootPart.CFrame = HumanoidRootPart.CFrame + SpeedCFrame
+				DamageTick = tick() + 0.4
+			end
+		end
+	end
+	if Humanoid.Health > 0 and HumanoidRootPart and ReachBooleanValue == true then
+		Bedwars.CombatConstant.RAYCAST_SWORD_CHARACTER_DISTANCE = 20
+	end
+
+end)
+
+if Humanoid.Health > 0 then
+	task.wait(0.3)
+	local NearestBed = nil
+	local MinDistance = math.huge
+	for _, v in pairs(game.Workspace:GetDescendants()) do
+		if v.Name:lower() == "bed" and v:FindFirstChild("Covers") and v:FindFirstChild("Covers").BrickColor ~= Player.Team.TeamColor then
+			local Distance = (v.Position - HumanoidRootPart.Position).magnitude
+			if Distance < MinDistance then
+				NearestBed = v
+				MinDistance = Distance
+				local TweenInformation = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 0)
+				local NearestBedTween = TweenService:Create(HumanoidRootPart, TweenInformation, {CFrame = NearestBed.CFrame + Vector3.new(0, 5, 0)})
+				NearestBedTween:Play()
+			end
+		end	
+	end	
+end
+
+
+RunService.Heartbeat:Connect(function()
+	Bedwars.ZephyrController.updateJump = OldZephyrUpdate
+end)
